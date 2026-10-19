@@ -199,6 +199,13 @@ section{padding-block:72px;position:relative}
 .field.bad .err{display:block}
 @keyframes shake{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
 .send{justify-self:start}
+.sent{display:none;gap:10px;padding:18px;border-radius:20px;background:var(--mint-soft);border:2px dashed var(--teal-2)}
+.sent.show{display:grid}
+.sent b{font-family:var(--display);color:var(--teal);font-size:1.05rem}
+.sent ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.sent pre{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit;font-size:.92rem;background:var(--paper);border-radius:14px;padding:12px 14px;border:2px solid var(--line)}
+.sent .acts{display:flex;flex-wrap:wrap;gap:10px}
+.sent .btn{font-size:.95rem;padding:9px 18px}
 @media (max-width:820px){.signup-grid{grid-template-columns:1fr}.signup-mark{display:none}}
 @media (max-width:460px){.row{grid-template-columns:1fr}.form-card{padding:20px}}
 
@@ -446,6 +453,18 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;justify-content:spac
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.6 8.6 0 0 1-3.9-.9L3 20l1.1-4.6A8.4 8.4 0 1 1 21 11.5z"/></svg>
               ส่งใบสมัครทาง Messenger
             </button>
+            <div class="sent" id="sent" role="status" aria-live="polite">
+              <b id="sent-title">✅ คัดลอกใบสมัครแล้ว</b>
+              <ol>
+                <li>ในหน้าแชท Messenger ที่เปิดขึ้นมา <strong>แตะค้างที่ช่องพิมพ์ แล้วเลือก "วาง"</strong></li>
+                <li>กดส่งข้อความ ครูจะตอบกลับเพื่อนัดวันเรียน</li>
+              </ol>
+              <pre id="sent-text"></pre>
+              <div class="acts">
+                <button class="btn btn-sm" type="button" id="copy-again">คัดลอกอีกครั้ง</button>
+                <a class="btn btn-sm btn-coral" id="open-msg" target="_blank" rel="noopener">เปิด Messenger</a>
+              </div>
+            </div>
           </form>
         </div>
       </div>
@@ -525,16 +544,39 @@ footer .wrap{padding-block:18px;display:flex;flex-wrap:wrap;justify-content:spac
       "เบอร์ติดต่อ: " + phone + "\n" +
       "ข้อมูลเพิ่มเติม: " + (note || "-");
 
-    // open Messenger right away, while the tap still counts as a user action
-    const a = document.createElement("a");
-    a.href = MESSENGER + "?text=" + encodeURIComponent(message);
-    a.target = "_blank"; a.rel = "noopener";
-    document.body.appendChild(a); a.click(); a.remove();
-
-    // also copy the text, in case Messenger doesn't prefill it
-    try { navigator.clipboard.writeText(message).catch(() => {}); } catch {}
+    // m.me links can't prefill text, so copy the application first (while the page still has focus),
+    // then show how to paste it, then open Messenger
+    const copied = copyText(message);
+    sentText.textContent = message;
+    sentTitle.textContent = copied ? "✅ คัดลอกใบสมัครแล้ว" : "📋 กด \"คัดลอกอีกครั้ง\" แล้วนำไปวางในแชท";
+    sent.classList.add("show");
     burst(form.querySelector(".send"));
+    window.open(MESSENGER, "_blank", "noopener");
+    sent.scrollIntoView({behavior: reduce ? "auto" : "smooth", block: "nearest"});
   });
+
+  const sent = document.getElementById("sent"), sentText = document.getElementById("sent-text"), sentTitle = document.getElementById("sent-title");
+  document.getElementById("open-msg").href = MESSENGER;
+  document.getElementById("copy-again").addEventListener("click", e => {
+    const ok = copyText(sentText.textContent);
+    e.target.textContent = ok ? "คัดลอกแล้ว ✓" : "คัดลอกไม่ได้ — กดค้างที่ข้อความเพื่อคัดลอก";
+    if (ok) sentTitle.textContent = "✅ คัดลอกใบสมัครแล้ว";
+    setTimeout(() => e.target.textContent = "คัดลอกอีกครั้ง", 2500);
+  });
+
+  // synchronous copy (works on iOS Safari and in-app browsers), async API as a backup
+  function copyText(text){
+    let ok = false;
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.setAttribute("readonly", "");
+    ta.style.cssText = "position:fixed;top:0;left:0;opacity:0;font-size:16px";
+    document.body.appendChild(ta);
+    ta.select(); ta.setSelectionRange(0, text.length);
+    try { ok = document.execCommand("copy"); } catch {}
+    ta.remove();
+    try { navigator.clipboard.writeText(text).catch(() => {}); ok = ok || !!navigator.clipboard; } catch {}
+    return ok;
+  }
 
   // floating Arabic letters in the hero
   const floaters = document.querySelector(".floaters");
